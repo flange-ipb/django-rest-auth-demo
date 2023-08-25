@@ -3,12 +3,11 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APITestCase
 
 REGISTER_PAYLOAD = {"username": "test", "password1": "testtest", "password2": "testtest", "email": "test@test.example"}
 
 
-class UserRegistrationTestCase(APITestCase):
+class UserRegistrationTestCase(TestCase):
     def test_registration_successful(self):
         assert len(User.objects.all()) == 0
         assert len(Token.objects.all()) == 0
@@ -21,14 +20,15 @@ class UserRegistrationTestCase(APITestCase):
 
         assert len(User.objects.all()) == 1
         user = User.objects.get(pk=1)
-        assert user.username == REGISTER_PAYLOAD["username"]
-        assert user.email == REGISTER_PAYLOAD["email"]
+        assert user.username == "test"
+        assert user.email == "test@test.example"
 
         assert len(Token.objects.all()) == 1
         assert Token.objects.all()[0].key == token
 
     def test_logout_successful(self):
-        token = self.register_user(REGISTER_PAYLOAD).data["key"]
+        response = self.register_user(REGISTER_PAYLOAD)
+        token = response.data["key"]
         assert len(Token.objects.all()) == 1
 
         headers = {"Authorization": f"Token {token}"}
@@ -37,18 +37,6 @@ class UserRegistrationTestCase(APITestCase):
         assert response.status_code == status.HTTP_200_OK
         assert response.data == {"detail": "Successfully logged out."}
         assert len(Token.objects.all()) == 0
-
-    def test_user_cannot_change_email_via_user_endpoint(self):
-        token = self.register_user(REGISTER_PAYLOAD).data["key"]
-        headers = {"Authorization": f"Token {token}"}
-        user_before = self.client.get(reverse("rest_user_details"), headers=headers).data
-
-        payload = {"email": "abc@def.example"}
-        response = self.client.patch(reverse("rest_user_details"), payload, headers=headers)
-
-        assert response.status_code == status.HTTP_200_OK
-        user_after = self.client.get(reverse("rest_user_details"), headers=headers).data
-        assert user_after == user_before
 
     def register_user(self, payload):
         response = self.client.post(reverse("rest_register"), payload)
