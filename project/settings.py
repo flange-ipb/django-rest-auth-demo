@@ -132,4 +132,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SITE_ID = 1
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+}
+
+REST_AUTH = {
+    'SESSION_LOGIN': False,
+}
+
 ACCOUNT_EMAIL_VERIFICATION = 'none'
