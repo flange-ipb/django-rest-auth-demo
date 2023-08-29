@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
@@ -54,7 +56,7 @@ def test_user_cannot_login_with_email(db, api_client):
     logout(api_client, token)
 
     payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
-    response = api_client.post(reverse("rest_login"), payload)
+    response = login(api_client, payload)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -64,7 +66,40 @@ def test_user_can_login_with_username(db, api_client):
     logout(api_client, token)
 
     payload = {"username": REGISTER_PAYLOAD["username"], "password": REGISTER_PAYLOAD["password1"]}
-    response = api_client.post(reverse("rest_login"), payload)
+    response = login(api_client, payload)
+
+    assert response.status_code == status.HTTP_200_OK
+    token = response.data["key"]
+    assert token is not None
+
+
+def test_password_reset_via_email(db, api_client, mailoutbox):
+    assert len(mailoutbox) == 0
+    token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    logout(api_client, token)
+
+    payload = {"email": REGISTER_PAYLOAD["email"]}
+    response = api_client.post(reverse("rest_password_reset"), payload)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(mailoutbox) == 1
+
+    # extract user id and token from the email and send it to the confirm endpoint
+    m = re.search(
+        r"password-reset/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})",
+        mailoutbox[0].body
+    )
+
+    new_pw = "test1234"
+    payload = {"uid": m.group("uid"), "token": m.group("token"), "new_password1": new_pw, "new_password2": new_pw}
+    response = api_client.post(reverse("rest_password_reset_confirm"), payload)
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.content == b'{"detail":"Password has been reset with the new password."}'
+
+    # can log in with new password
+    payload = {"username": REGISTER_PAYLOAD["username"], "password": new_pw}
+    response = login(api_client, payload)
 
     assert response.status_code == status.HTTP_200_OK
     token = response.data["key"]
@@ -74,6 +109,10 @@ def test_user_can_login_with_username(db, api_client):
 def register_user(client, payload):
     response = client.post(reverse("rest_register"), payload)
     return response
+
+
+def login(client, payload):
+    return client.post(reverse("rest_login"), payload)
 
 
 def logout(client, token):
