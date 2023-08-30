@@ -138,13 +138,16 @@ REST_FRAMEWORK = {
     ],
 }
 
+# dj-rest-auth settings
+# see https://dj-rest-auth.readthedocs.io/en/latest/configuration.html
 REST_AUTH = {
     'SESSION_LOGIN': False,
     'OLD_PASSWORD_FIELD_ENABLED': True,
-
 }
 
+# django-allauth settings
 ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_EMAIL_REQUIRED = True
 
 SWAGGER_SETTINGS = {
    'SECURITY_DEFINITIONS': {

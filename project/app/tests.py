@@ -58,6 +58,7 @@ def test_registration_fails_due_to_missing_fields(db, api_client):
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.content.decode() == '{"username":["This field is required."],' \
+                                        '"email":["This field is required."],' \
                                         '"password1":["This field is required."],' \
                                         '"password2":["This field is required."]}'
 
