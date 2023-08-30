@@ -87,24 +87,27 @@ def test_user_cannot_change_email_via_user_endpoint(db, api_client):
     assert user_after == user_before
 
 
-def test_user_cannot_login_with_email(db, api_client):
+def test_user_can_login_with_email(db, api_client):
     register_user(api_client, REGISTER_PAYLOAD)
 
     payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
     response = login(api_client, payload)
 
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.status_code == status.HTTP_200_OK
+
+    # we get a token
+    token = response.data["key"]
+    assert token is not None
 
 
-def test_user_can_login_with_username(db, api_client):
+def test_user_cannot_login_with_username(db, api_client):
     register_user(api_client, REGISTER_PAYLOAD)
 
     payload = {"username": REGISTER_PAYLOAD["username"], "password": REGISTER_PAYLOAD["password1"]}
     response = login(api_client, payload)
 
-    assert response.status_code == status.HTTP_200_OK
-    token = response.data["key"]
-    assert token is not None
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.content.decode() == '{"non_field_errors":["Must include \\"email\\" and \\"password\\"."]}'
 
 
 def test_password_reset_via_email(db, api_client, mailoutbox):
@@ -116,11 +119,15 @@ def test_password_reset_via_email(db, api_client, mailoutbox):
 
     assert response.status_code == status.HTTP_200_OK
     assert len(mailoutbox) == 1
+    email = mailoutbox[0].body
+
+    # username is not part of the email
+    assert f'username is {REGISTER_PAYLOAD["username"]}' not in email
 
     # extract user id and token from the email and send it to the confirm endpoint
     m = re.search(
         r"password-reset/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})",
-        mailoutbox[0].body
+        email
     )
 
     new_pw = "test1234"
@@ -131,7 +138,7 @@ def test_password_reset_via_email(db, api_client, mailoutbox):
     assert response.data == {"detail": "Password has been reset with the new password."}
 
     # can log in with new password
-    payload = {"username": REGISTER_PAYLOAD["username"], "password": new_pw}
+    payload = {"email": REGISTER_PAYLOAD["email"], "password": new_pw}
     response = login(api_client, payload)
 
     assert response.status_code == status.HTTP_200_OK
