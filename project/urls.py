@@ -14,11 +14,12 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.urls import path, include, re_path
-from django.views.generic import TemplateView
+from django.urls import path, include
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+
+from project.app.views import not_found
 
 schema_view = get_schema_view(
     openapi.Info(title="My API", default_version='v1'),
@@ -32,7 +33,7 @@ urlpatterns = [
     # 'rest_password_reset_confirm'.
     # See https://dj-rest-auth.readthedocs.io/en/stable/faq.html and
     # https://github.com/iMerica/dj-rest-auth/blob/master/demo/demo/urls.py
-    path('auth/password-reset/confirm/<uidb64>/<token>', TemplateView.as_view(), name='password_reset_confirm'),
+    path('auth/password-reset/confirm/<uid>/<token>', not_found, name='password_reset_confirm'),
 
     path('auth/', include('dj_rest_auth.urls')),
     path('auth/registration/', include('dj_rest_auth.registration.urls')),
