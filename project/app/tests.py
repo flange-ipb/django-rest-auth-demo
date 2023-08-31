@@ -235,6 +235,24 @@ class TestPasswordReset:
         assert response.status_code == status.HTTP_200_OK
         assert len(mailoutbox) == 0
 
+    def test_password_reset_confirm_view_does_nothing(self, db, requests_client):
+        url = f'http://testserver{reverse("password_reset_confirm", kwargs={"uidb64": 1, "token": "some token"})}'
+
+        response = requests_client.delete(url)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+        response = requests_client.get(url)
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+        response = requests_client.patch(url)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+        response = requests_client.post(url)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+        response = requests_client.put(url)
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
 
 class TestPasswordChange:
     def test_password_change_successful(self, db, api_client):
