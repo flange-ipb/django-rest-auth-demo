@@ -125,13 +125,10 @@ def test_password_reset_via_email(db, api_client, mailoutbox):
     assert f'username is {REGISTER_PAYLOAD["username"]}' not in email
 
     # extract user id and token from the email and send it to the confirm endpoint
-    m = re.search(
-        r"password-reset/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})",
-        email
-    )
+    uid, confirm_token = extract_password_reset_email(email)
 
     new_pw = "test1234"
-    payload = {"uid": m.group("uid"), "token": m.group("token"), "new_password1": new_pw, "new_password2": new_pw}
+    payload = {"uid": uid, "token": confirm_token, "new_password1": new_pw, "new_password2": new_pw}
     response = api_client.post(reverse("rest_password_reset_confirm"), payload)
 
     assert response.status_code == status.HTTP_200_OK
@@ -144,6 +141,63 @@ def test_password_reset_via_email(db, api_client, mailoutbox):
     assert response.status_code == status.HTTP_200_OK
     token = response.data["key"]
     assert token is not None
+
+
+def test_cannot_reuse_password_reset_confirm_token(db, api_client, mailoutbox):
+    register_user(api_client, REGISTER_PAYLOAD)
+    payload = {"email": REGISTER_PAYLOAD["email"]}
+    api_client.post(reverse("rest_password_reset"), payload)
+    uid, confirm_token = extract_password_reset_email(mailoutbox[0].body)
+
+    # reset password
+    new_pw = "test1234"
+    payload = {"uid": uid, "token": confirm_token, "new_password1": new_pw, "new_password2": new_pw}
+    api_client.post(reverse("rest_password_reset_confirm"), payload)
+
+    # try to reset the password a second time
+    new_pw2 = "test9876"
+    payload = {"uid": uid, "token": confirm_token, "new_password1": new_pw2, "new_password2": new_pw2}
+    response = api_client.post(reverse("rest_password_reset_confirm"), payload)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.content.decode() == '{"token":["Invalid value"]}'
+    # Why is this happening?
+    # user.password is part of the token, so the first password reset invalidates it. See
+    # https://github.com/django/django/blob/74b5074174d1749ee44df2f7ed418010a7a4ac70/django/contrib/auth/tokens.py#L122
+
+
+def test_cannot_reset_password_of_other_user_with_token(db, api_client, mailoutbox):
+    register_user(api_client, REGISTER_PAYLOAD)
+    payload = {"username": "user2", "password1": "test1234", "password2": "test1234", "email": "user@user.example"}
+    register_user(api_client, payload)
+    payload = {"email": REGISTER_PAYLOAD["email"]}
+    api_client.post(reverse("rest_password_reset"), payload)
+    _, confirm_token = extract_password_reset_email(mailoutbox[0].body)
+
+    # try to reset password
+    new_pw = "test1234"
+    payload = {"uid": 2, "token": confirm_token, "new_password1": new_pw, "new_password2": new_pw}
+    response = api_client.post(reverse("rest_password_reset_confirm"), payload)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.content.decode() == '{"token":["Invalid value"]}'
+    # Why is this happening?
+    # user.pk is part of the token. See
+    # https://github.com/django/django/blob/74b5074174d1749ee44df2f7ed418010a7a4ac70/django/contrib/auth/tokens.py#L122
+
+
+def test_can_enumerate_user_ids_with_password_reset_confirm(db, api_client, mailoutbox):
+    register_user(api_client, REGISTER_PAYLOAD)
+    payload = {"email": REGISTER_PAYLOAD["email"]}
+    api_client.post(reverse("rest_password_reset"), payload)
+    _, confirm_token = extract_password_reset_email(mailoutbox[0].body)
+
+    new_pw = "test1234"
+    payload = {"uid": 2, "token": confirm_token, "new_password1": new_pw, "new_password2": new_pw}
+    response = api_client.post(reverse("rest_password_reset_confirm"), payload)
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.content.decode() == '{"uid":["Invalid value"]}'
 
 
 def test_password_change_successful(db, api_client):
@@ -213,3 +267,11 @@ def logout(client, token):
 
 def auth_header(token):
     return {"Authorization": f"Token {token}"}
+
+
+def extract_password_reset_email(email):
+    m = re.search(
+        r"password-reset/confirm/(?P<uid>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,32})",
+        email
+    )
+    return m.group("uid"), m.group("token")
