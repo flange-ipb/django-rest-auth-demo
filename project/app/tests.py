@@ -86,9 +86,17 @@ class TestUserEndpoint:
         user_after = api_client.get(reverse("rest_user_details"), headers=headers).data
         assert user_after == user_before
 
+    def test_cannot_delete_user(self, db, api_client):
+        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+        headers = auth_header(token)
+
+        response = api_client.delete(reverse("rest_user_details"), headers=headers)
+
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+
 
 class TestLogin:
-    def test_user_can_login_with_email(self, db, api_client):
+    def test_can_login_with_email(self, db, api_client):
         register_user(api_client, REGISTER_PAYLOAD)
 
         payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
@@ -100,7 +108,7 @@ class TestLogin:
         token = response.data["key"]
         assert token is not None
 
-    def test_user_cannot_login_with_username(self, db, api_client):
+    def test_cannot_login_with_username(self, db, api_client):
         register_user(api_client, REGISTER_PAYLOAD)
 
         payload = {"username": REGISTER_PAYLOAD["username"], "password": REGISTER_PAYLOAD["password1"]}
@@ -108,6 +116,27 @@ class TestLogin:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.content.decode() == '{"non_field_errors":["Must include \\"email\\" and \\"password\\"."]}'
+
+    def test_cannot_login_with_wrong_password(self, db, api_client):
+        register_user(api_client, REGISTER_PAYLOAD)
+
+        payload = {"email": REGISTER_PAYLOAD["email"], "password": "wrong password"}
+        response = login(api_client, payload)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.content.decode() == '{"non_field_errors":["Unable to log in with provided credentials."]}'
+
+    def test_inactive_user_cannot_login(self, db, api_client):
+        register_user(api_client, REGISTER_PAYLOAD)
+        user = User.objects.get(pk=1)
+        user.is_active = False
+        user.save()
+
+        payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
+        response = login(api_client, payload)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.content.decode() == '{"non_field_errors":["Unable to log in with provided credentials."]}'
 
 
 class TestPasswordReset:
@@ -197,6 +226,14 @@ class TestPasswordReset:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.content.decode() == '{"uid":["Invalid value"]}'
+
+    def test_password_reset_with_unknown_email_address_does_not_send_email(self, db, api_client, mailoutbox):
+        payload = {"email": "unknown@user.example"}
+
+        response = api_client.post(reverse("rest_password_reset"), payload)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert len(mailoutbox) == 0
 
 
 class TestPasswordChange:
