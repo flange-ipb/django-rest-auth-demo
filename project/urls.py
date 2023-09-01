@@ -28,12 +28,12 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
-    # The view named 'password_reset_confirm' is only used to build the confirmation URL that is used in the password
-    # reset email. It can be used to direct the client to an SPA's view which invokes the view
-    # 'rest_password_reset_confirm'.
+    # The view named 'password_reset_confirm' is only necessary to build the confirmation URL that is used in the
+    # password reset email. It can be used to direct the client to an SPA's view which invokes the view
+    # 'rest_password_reset_confirm' with the appropriate data.
     # See https://dj-rest-auth.readthedocs.io/en/stable/faq.html and
     # https://github.com/iMerica/dj-rest-auth/blob/master/demo/demo/urls.py
-    path('auth/password-reset/confirm/<uid>/<token>', not_found, name='password_reset_confirm'),
+    path('spa/password-reset/confirm/<uid>/<token>', not_found, name='password_reset_confirm'),
 
     path('auth/', include('dj_rest_auth.urls')),
     path('auth/registration/', include('dj_rest_auth.registration.urls')),

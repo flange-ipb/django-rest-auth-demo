@@ -3,5 +3,5 @@ from django.views.decorators.csrf import csrf_exempt
 
 
 @csrf_exempt
-def not_found(request, uid, token):
+def not_found(*args, **kwargs):
     raise Http404()
