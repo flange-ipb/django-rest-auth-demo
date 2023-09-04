@@ -227,12 +227,15 @@ class TestPasswordReset:
     # Is this a security issue? Probably not.
     def test_can_enumerate_user_ids_with_password_reset_confirm(self, db, api_client, mailoutbox):
         register_user(api_client, REGISTER_PAYLOAD)
-        payload = {"email": REGISTER_PAYLOAD["email"]}
-        api_client.post(reverse("rest_password_reset"), payload)
-        _, confirm_token = extract_password_reset_email(mailoutbox[0].body)
 
         new_pw = "test1234"
-        payload = {"uid": 2, "token": confirm_token, "new_password1": new_pw, "new_password2": new_pw}
+        payload = {"uid": 1, "token": "xxx", "new_password1": new_pw, "new_password2": new_pw}
+        response = api_client.post(reverse("rest_password_reset_confirm"), payload)
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.content.decode() == '{"token":["Invalid value"]}'
+
+        payload = {"uid": 2, "token": "xxx", "new_password1": new_pw, "new_password2": new_pw}
         response = api_client.post(reverse("rest_password_reset_confirm"), payload)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
