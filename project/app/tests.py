@@ -74,7 +74,18 @@ class TestLogout:
 
 
 class TestUserEndpoint:
-    def test_user_cannot_change_email_via_user_endpoint(self, db, api_client):
+    def test_change_user_info(self, db, api_client):
+        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+        headers = auth_header(token)
+
+        payload = {"username": "user123", "first_name": "firstname", "last_name": "lastname"}
+        response = api_client.put(reverse("rest_user_details"), payload, headers=headers)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {'pk': 1, 'username': 'user123', 'email': 'test@test.example',
+                                 'first_name': 'firstname', 'last_name': 'lastname'}
+
+    def test_user_cannot_change_email(self, db, api_client):
         token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
         headers = auth_header(token)
         user_before = api_client.get(reverse("rest_user_details"), headers=headers).data
