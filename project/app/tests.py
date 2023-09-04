@@ -9,17 +9,14 @@ REGISTER_PAYLOAD = {"username": "test", "password1": "testtest", "password2": "t
 
 
 class TestRegistration:
-    def test_registration_successful_get_token_immediately_and_no_email_sent(self, db, api_client, mailoutbox):
+    def test_registration_workflow(self, db, api_client, mailoutbox):
         assert len(User.objects.all()) == 0
         assert len(Token.objects.all()) == 0
 
         response = register_user(api_client, REGISTER_PAYLOAD)
 
         assert response.status_code == status.HTTP_201_CREATED
-
-        # we get a token
-        token = response.data["key"]
-        assert token is not None
+        assert response.data == {'detail': 'Verification e-mail sent.'}
 
         # user object was created
         assert len(User.objects.all()) == 1
@@ -27,12 +24,29 @@ class TestRegistration:
         assert user.username == REGISTER_PAYLOAD["username"]
         assert user.email == REGISTER_PAYLOAD["email"]
 
-        # token is in the database
-        assert len(Token.objects.all()) == 1
-        assert Token.objects.all()[0].key == token
+        # user has an unverified email address
+        email_objs = user.emailaddress_set.all()
+        assert len(email_objs) == 1
+        assert not email_objs[0].verified
 
-        # no email was sent
-        assert len(mailoutbox) == 0
+        # verification email was sent
+        assert len(mailoutbox) == 1
+
+        # extract verify key from email and send it to the email verification endpoint
+        payload = {"key": extract_email_verify_email(mailoutbox[0].body)}
+
+        response = api_client.post(reverse("rest_verify_email"), payload)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {'detail': 'ok'}
+
+        # user has a verified email address
+        email_objs = user.emailaddress_set.all()
+        assert len(email_objs) == 1
+        assert email_objs[0].verified
+
+        # no new email was sent
+        assert len(mailoutbox) == 1
 
     def test_registration_fails_due_to_password_missmatch(self, db, api_client):
         payload = {"username": "test", "password1": "test1234", "password2": "testtest", "email": "test@test.example"}
@@ -42,14 +56,16 @@ class TestRegistration:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.content.decode() == '{"non_field_errors":["The two password fields didn\'t match."]}'
 
-    def test_registration_fails_due_to_duplicate_username_and_email(self, db, api_client):
+    def test_registration_fails_due_to_duplicate_username_and_email(self, db, api_client, mailoutbox):
         register_user(api_client, REGISTER_PAYLOAD)
+        mailoutbox.clear()
 
         response = register_user(api_client, REGISTER_PAYLOAD)
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.content.decode() == '{"username":["A user with that username already exists."],' \
                                             '"email":["A user is already registered with this e-mail address."]}'
+        assert len(mailoutbox) == 0
 
     def test_registration_fails_due_to_missing_fields(self, db, api_client):
         response = register_user(api_client, {})
@@ -62,8 +78,8 @@ class TestRegistration:
 
 
 class TestLogout:
-    def test_logout_token_is_removed_from_database(self, db, api_client):
-        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    def test_logout_token_is_removed_from_database(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         assert len(Token.objects.all()) == 1
 
         response = logout(api_client, token)
@@ -74,8 +90,8 @@ class TestLogout:
 
 
 class TestUserEndpoint:
-    def test_change_user_info(self, db, api_client):
-        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    def test_change_user_info(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         headers = auth_header(token)
 
         payload = {"username": "user123", "first_name": "firstname", "last_name": "lastname"}
@@ -85,8 +101,8 @@ class TestUserEndpoint:
         assert response.data == {'pk': 1, 'username': 'user123', 'email': 'test@test.example',
                                  'first_name': 'firstname', 'last_name': 'lastname'}
 
-    def test_user_cannot_change_email(self, db, api_client):
-        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    def test_user_cannot_change_email(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         headers = auth_header(token)
         user_before = api_client.get(reverse("rest_user_details"), headers=headers).data
 
@@ -97,8 +113,8 @@ class TestUserEndpoint:
         user_after = api_client.get(reverse("rest_user_details"), headers=headers).data
         assert user_after == user_before
 
-    def test_cannot_delete_user(self, db, api_client):
-        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    def test_cannot_delete_user(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         headers = auth_header(token)
 
         response = api_client.delete(reverse("rest_user_details"), headers=headers)
@@ -107,8 +123,8 @@ class TestUserEndpoint:
 
 
 class TestLogin:
-    def test_can_login_with_email(self, db, api_client):
-        register_user(api_client, REGISTER_PAYLOAD)
+    def test_can_login_with_email(self, db, api_client, mailoutbox):
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
         payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
         response = login(api_client, payload)
@@ -119,8 +135,8 @@ class TestLogin:
         token = response.data["key"]
         assert token is not None
 
-    def test_cannot_login_with_username(self, db, api_client):
-        register_user(api_client, REGISTER_PAYLOAD)
+    def test_cannot_login_with_username(self, db, api_client, mailoutbox):
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
         payload = {"username": REGISTER_PAYLOAD["username"], "password": REGISTER_PAYLOAD["password1"]}
         response = login(api_client, payload)
@@ -128,8 +144,8 @@ class TestLogin:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.content.decode() == '{"non_field_errors":["Must include \\"email\\" and \\"password\\"."]}'
 
-    def test_cannot_login_with_wrong_password(self, db, api_client):
-        register_user(api_client, REGISTER_PAYLOAD)
+    def test_cannot_login_with_wrong_password(self, db, api_client, mailoutbox):
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
         payload = {"email": REGISTER_PAYLOAD["email"], "password": "wrong password"}
         response = login(api_client, payload)
@@ -137,8 +153,9 @@ class TestLogin:
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.content.decode() == '{"non_field_errors":["Unable to log in with provided credentials."]}'
 
-    def test_inactive_user_cannot_login(self, db, api_client):
-        register_user(api_client, REGISTER_PAYLOAD)
+    def test_inactive_user_cannot_login(self, db, api_client, mailoutbox):
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
+
         user = User.objects.get(pk=1)
         user.is_active = False
         user.save()
@@ -152,8 +169,9 @@ class TestLogin:
 
 class TestPasswordReset:
     def test_password_reset_via_email(self, db, api_client, mailoutbox):
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
+        mailoutbox.clear()
         assert len(mailoutbox) == 0
-        register_user(api_client, REGISTER_PAYLOAD)
 
         payload = {"email": REGISTER_PAYLOAD["email"]}
         response = api_client.post(reverse("rest_password_reset"), payload)
@@ -184,7 +202,9 @@ class TestPasswordReset:
         assert token is not None
 
     def test_cannot_reuse_password_reset_confirm_token(self, db, api_client, mailoutbox):
-        register_user(api_client, REGISTER_PAYLOAD)
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
+        mailoutbox.clear()
+
         payload = {"email": REGISTER_PAYLOAD["email"]}
         api_client.post(reverse("rest_password_reset"), payload)
         uid, confirm_token = extract_password_reset_email(mailoutbox[0].body)
@@ -206,9 +226,13 @@ class TestPasswordReset:
         # https://github.com/django/django/blob/74b5074174d1749ee44df2f7ed418010a7a4ac70/django/contrib/auth/tokens.py#L122
 
     def test_cannot_reset_password_of_other_user_with_token(self, db, api_client, mailoutbox):
-        register_user(api_client, REGISTER_PAYLOAD)
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
+        mailoutbox.clear()
+
         payload = {"username": "user2", "password1": "test1234", "password2": "test1234", "email": "user@user.example"}
-        register_user(api_client, payload)
+        register_and_verify(api_client, payload, mailoutbox)
+        mailoutbox.clear()
+
         payload = {"email": REGISTER_PAYLOAD["email"]}
         api_client.post(reverse("rest_password_reset"), payload)
         _, confirm_token = extract_password_reset_email(mailoutbox[0].body)
@@ -226,7 +250,7 @@ class TestPasswordReset:
 
     # Is this a security issue? Probably not.
     def test_can_enumerate_user_ids_with_password_reset_confirm(self, db, api_client, mailoutbox):
-        register_user(api_client, REGISTER_PAYLOAD)
+        register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
         new_pw = "test1234"
         payload = {"uid": 1, "token": "xxx", "new_password1": new_pw, "new_password2": new_pw}
@@ -269,8 +293,8 @@ class TestPasswordReset:
 
 
 class TestPasswordChange:
-    def test_password_change_successful(self, db, api_client):
-        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    def test_password_change_successful(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         headers = auth_header(token)
         new_pw = "test1234"
         old_pw_in_db = User.objects.get(pk=1).password
@@ -287,8 +311,8 @@ class TestPasswordChange:
         # token is still active
         assert Token.objects.all()[0].key == token
 
-    def test_password_change_fails_due_to_wrong_old_password(self, db, api_client):
-        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    def test_password_change_fails_due_to_wrong_old_password(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         headers = auth_header(token)
         new_pw = "test1234"
         old_pw_in_db = User.objects.get(pk=1).password
@@ -303,8 +327,8 @@ class TestPasswordChange:
         # password wasn't changed in the database
         assert User.objects.get(pk=1).password == old_pw_in_db
 
-    def test_password_change_fails_due_to_new_password_mismatch(self, db, api_client):
-        token = register_user(api_client, REGISTER_PAYLOAD).data["key"]
+    def test_password_change_fails_due_to_new_password_mismatch(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         headers = auth_header(token)
         old_pw_in_db = User.objects.get(pk=1).password
 
@@ -328,6 +352,20 @@ def login(client, payload):
     return client.post(reverse("rest_login"), payload)
 
 
+def register_and_verify(client, register_payload, mailbox):
+    register_user(client, register_payload)
+
+    payload = {"key": extract_email_verify_email(mailbox[0].body)}
+    client.post(reverse("rest_verify_email"), payload)
+
+
+def register_and_login(client, register_payload, mailbox):
+    register_and_verify(client, register_payload, mailbox)
+
+    payload = {"email": register_payload["email"], "password": register_payload["password1"]}
+    return login(client, payload).data["key"]
+
+
 def logout(client, token):
     headers = auth_header(token)
     return client.post(reverse("rest_logout"), headers=headers)
@@ -335,6 +373,10 @@ def logout(client, token):
 
 def auth_header(token):
     return {"Authorization": f"Token {token}"}
+
+
+def extract_email_verify_email(email):
+    return re.search(r"account-confirm-email/(?P<key>[-:\w]+)", email).group("key")
 
 
 def extract_password_reset_email(email):

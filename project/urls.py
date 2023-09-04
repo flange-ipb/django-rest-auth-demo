@@ -28,6 +28,12 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
+    path('auth/', include('dj_rest_auth.urls')),
+    path('auth/registration/', include('dj_rest_auth.registration.urls')),
+    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+
     # The view named 'password_reset_confirm' is only necessary to build the confirmation URL that is used in the
     # password reset email. It can be used to direct the client to an SPA's view which invokes the view
     # 'rest_password_reset_confirm' with the appropriate data.
@@ -35,9 +41,6 @@ urlpatterns = [
     # https://github.com/iMerica/dj-rest-auth/blob/master/demo/demo/urls.py
     path('spa/password-reset/confirm/<uid>/<token>', not_found, name='password_reset_confirm'),
 
-    path('auth/', include('dj_rest_auth.urls')),
-    path('auth/registration/', include('dj_rest_auth.registration.urls')),
-    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    # Same argumentation as above: The SPA needs to invoke the 'rest_verify_email' view with the key as payload.
+    path('spa/account-confirm-email/<key>', not_found, name='account_confirm_email'),
 ]
