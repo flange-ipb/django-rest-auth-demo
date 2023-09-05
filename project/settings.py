@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',
     'rest_framework',
-    'rest_framework.authtoken',
+    'rest_framework_simplejwt.token_blacklist',
     'allauth',
     'allauth.account',
     'dj_rest_auth',
@@ -139,18 +139,22 @@ AUTHENTICATION_BACKENDS = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'dj_rest_auth.jwt_auth.JWTCookieAuthentication',
     ],
 }
 
 # dj-rest-auth settings
 # see https://dj-rest-auth.readthedocs.io/en/latest/configuration.html
 REST_AUTH = {
-    'SESSION_LOGIN': False,
     'OLD_PASSWORD_FIELD_ENABLED': True,
+    'SESSION_LOGIN': False,
+    'TOKEN_MODEL': None,
+    'USE_JWT': True,
+    'JWT_AUTH_HTTPONLY': False,  # https://github.com/iMerica/dj-rest-auth/issues/485
 }
 
 # django-allauth settings
+# see https://django-allauth.readthedocs.io/en/latest/account/configuration.html
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'

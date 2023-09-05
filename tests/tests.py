@@ -1,9 +1,11 @@
 import re
 
+import pytest
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 REGISTER_PAYLOAD = {"username": "test", "password1": "testtest", "password2": "testtest", "email": "test@test.example"}
 
@@ -131,9 +133,27 @@ class TestLogin:
 
         assert response.status_code == status.HTTP_200_OK
 
-        # we get a token
-        token = response.data["key"]
-        assert token is not None
+        # validate access token
+        access_token = response.data["access"]
+        assert access_token is not None
+        at_obj = AccessToken(access_token)
+        at_obj.verify()
+        at_obj.verify_token_type()
+        assert at_obj.get("user_id") == 1
+
+        # validate refresh token
+        refresh_token = response.data["refresh"]
+        assert refresh_token is not None
+        rt_obj = RefreshToken(refresh_token)
+        rt_obj.verify()
+        rt_obj.verify_token_type()
+        assert rt_obj.get("user_id") == 1
+
+        assert response.data["user"] == {'pk': 1,
+                                         'username': REGISTER_PAYLOAD["username"],
+                                         'email': REGISTER_PAYLOAD["email"],
+                                         'first_name': '',
+                                         'last_name': ''}
 
     def test_cannot_login_with_username(self, db, api_client, mailoutbox):
         register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
@@ -168,21 +188,41 @@ class TestLogin:
 
 
 class TestLogout:
-    def test_logout_token_is_removed_from_database(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        assert len(Token.objects.all()) == 1
+    def test_logout_refresh_token_gets_blacklisted(self, db, api_client, mailoutbox):
+        access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        rt_obj = RefreshToken(refresh_token)
+        rt_obj.check_blacklist()
 
-        response = logout(api_client, token)
+        response = logout(api_client, access_token, refresh_token)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data == {"detail": "Successfully logged out."}
-        assert len(Token.objects.all()) == 0
+
+        with pytest.raises(TokenError):
+            rt_obj = RefreshToken(refresh_token)
+            rt_obj.check_blacklist()
+
+    def test_logout_can_still_use_access_token(self, db, api_client, mailoutbox):
+        access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        logout(api_client, access_token, refresh_token)
+
+        AccessToken(access_token).verify()  # no exception raised
+
+        headers = auth_header(access_token)
+        response = api_client.get(reverse("rest_user_details"), headers=headers)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {'pk': 1,
+                                 'username': REGISTER_PAYLOAD["username"],
+                                 'email': REGISTER_PAYLOAD["email"],
+                                 'first_name': '',
+                                 'last_name': ''}
 
 
 class TestUserEndpoint:
     def test_change_user_info(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
+        access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(access_token)
 
         payload = {"username": "user123", "first_name": "firstname", "last_name": "lastname"}
         response = api_client.put(reverse("rest_user_details"), payload, headers=headers)
@@ -192,8 +232,8 @@ class TestUserEndpoint:
                                  'first_name': 'firstname', 'last_name': 'lastname'}
 
     def test_user_cannot_change_email(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
+        access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(access_token)
         user_before = api_client.get(reverse("rest_user_details"), headers=headers).data
 
         payload = {"email": "abc@def.example"}
@@ -204,8 +244,8 @@ class TestUserEndpoint:
         assert user_after == user_before
 
     def test_cannot_delete_user(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
+        access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(access_token)
 
         response = api_client.delete(reverse("rest_user_details"), headers=headers)
 
@@ -244,8 +284,8 @@ class TestPasswordReset:
         response = login(api_client, payload)
 
         assert response.status_code == status.HTTP_200_OK
-        token = response.data["key"]
-        assert token is not None
+        access_token = response.data["access"]
+        assert access_token is not None
 
     def test_cannot_reuse_password_reset_confirm_token(self, db, api_client, mailoutbox):
         register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
@@ -341,8 +381,8 @@ class TestPasswordReset:
 
 class TestPasswordChange:
     def test_password_change_successful(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
+        access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(access_token)
         new_pw = "test1234"
         old_pw_in_db = User.objects.get(pk=1).password
 
@@ -355,12 +395,9 @@ class TestPasswordChange:
         # password was changed in the database
         assert User.objects.get(pk=1).password != old_pw_in_db
 
-        # token is still active
-        assert Token.objects.all()[0].key == token
-
     def test_password_change_fails_due_to_wrong_old_password(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
+        access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(access_token)
         new_pw = "test1234"
         old_pw_in_db = User.objects.get(pk=1).password
 
@@ -375,8 +412,8 @@ class TestPasswordChange:
         assert User.objects.get(pk=1).password == old_pw_in_db
 
     def test_password_change_fails_due_to_new_password_mismatch(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
+        access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(access_token)
         old_pw_in_db = User.objects.get(pk=1).password
 
         payload = {"new_password1": "test1234", "new_password2": "1234test",
@@ -410,16 +447,18 @@ def register_and_login(client, register_payload, mailbox):
     register_and_verify(client, register_payload, mailbox)
 
     payload = {"email": register_payload["email"], "password": register_payload["password1"]}
-    return login(client, payload).data["key"]
+    login_data = login(client, payload).data
+    return login_data["access"], login_data["refresh"]
 
 
-def logout(client, token):
-    headers = auth_header(token)
-    return client.post(reverse("rest_logout"), headers=headers)
+def logout(client, access_token, refresh_token):
+    headers = auth_header(access_token)
+    payload = {"refresh": refresh_token}
+    return client.post(reverse("rest_logout"), payload, headers=headers)
 
 
 def auth_header(token):
-    return {"Authorization": f"Token {token}"}
+    return {"Authorization": f"Bearer {token}"}
 
 
 def extract_email_verify_email(email):
