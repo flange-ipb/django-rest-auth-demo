@@ -198,7 +198,7 @@ class TestLogout:
         rt_obj = RefreshToken(refresh_token)
         rt_obj.check_blacklist()
 
-        response = logout(api_client, access_token, refresh_token)
+        response = logout(api_client, refresh_token)
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data == {"detail": "Successfully logged out."}
@@ -209,7 +209,7 @@ class TestLogout:
 
     def test_after_logout_access_token_is_still_valid(self, db, api_client, mailoutbox):
         access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        logout(api_client, access_token, refresh_token)
+        logout(api_client, refresh_token)
 
         AccessToken(access_token).verify()  # no exception raised
 
@@ -453,7 +453,7 @@ class TestVerifyJWT:
 
     def test_verify_blacklisted_token(self, db, api_client, mailoutbox):
         access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        logout(api_client, access_token, refresh_token)
+        logout(api_client, refresh_token)
 
         payload = {"token": refresh_token}
         response = api_client.post(reverse("token_verify"), payload)
@@ -491,7 +491,7 @@ class TestRefreshJWT:
 
     def test_refresh_with_blacklisted_token(self, db, api_client, mailoutbox):
         access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        logout(api_client, access_token, refresh_token)
+        logout(api_client, refresh_token)
 
         payload = {"refresh": refresh_token}
         response = api_client.post(reverse("token_refresh"), payload)
@@ -537,10 +537,9 @@ def register_and_login(client, register_payload, mailbox):
     return login_data["access"], login_data["refresh"]
 
 
-def logout(client, access_token, refresh_token):
-    headers = auth_header(access_token)
+def logout(client, refresh_token):
     payload = {"refresh": refresh_token}
-    return client.post(reverse("rest_logout"), payload, headers=headers)
+    return client.post(reverse("rest_logout"), payload)
 
 
 def auth_header(token):
