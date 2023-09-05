@@ -127,11 +127,16 @@ class TestResendEmailVerification:
 class TestLogin:
     def test_can_login_with_email(self, db, api_client, mailoutbox):
         register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
+        assert User.objects.get(pk=1).last_login is None
 
         payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
         response = login(api_client, payload)
 
         assert response.status_code == status.HTTP_200_OK
+
+        # User's last_login field is NOT updated!
+        # see https://github.com/iMerica/dj-rest-auth/issues/531
+        assert User.objects.get(pk=1).last_login is None
 
         # validate access token
         access_token = response.data["access"]
