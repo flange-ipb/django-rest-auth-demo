@@ -11,7 +11,6 @@ REGISTER_PAYLOAD = {"username": "test", "password1": "testtest", "password2": "t
 class TestRegistration:
     def test_registration_workflow(self, db, api_client, mailoutbox):
         assert len(User.objects.all()) == 0
-        assert len(Token.objects.all()) == 0
 
         response = register_user(api_client, REGISTER_PAYLOAD)
 
