@@ -76,51 +76,6 @@ class TestRegistration:
                                             '"password2":["This field is required."]}'
 
 
-class TestLogout:
-    def test_logout_token_is_removed_from_database(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        assert len(Token.objects.all()) == 1
-
-        response = logout(api_client, token)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data == {"detail": "Successfully logged out."}
-        assert len(Token.objects.all()) == 0
-
-
-class TestUserEndpoint:
-    def test_change_user_info(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
-
-        payload = {"username": "user123", "first_name": "firstname", "last_name": "lastname"}
-        response = api_client.put(reverse("rest_user_details"), payload, headers=headers)
-
-        assert response.status_code == status.HTTP_200_OK
-        assert response.data == {'pk': 1, 'username': 'user123', 'email': 'test@test.example',
-                                 'first_name': 'firstname', 'last_name': 'lastname'}
-
-    def test_user_cannot_change_email(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
-        user_before = api_client.get(reverse("rest_user_details"), headers=headers).data
-
-        payload = {"email": "abc@def.example"}
-        response = api_client.patch(reverse("rest_user_details"), payload, headers=headers)
-
-        assert response.status_code == status.HTTP_200_OK
-        user_after = api_client.get(reverse("rest_user_details"), headers=headers).data
-        assert user_after == user_before
-
-    def test_cannot_delete_user(self, db, api_client, mailoutbox):
-        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
-        headers = auth_header(token)
-
-        response = api_client.delete(reverse("rest_user_details"), headers=headers)
-
-        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
-
-
 class TestLogin:
     def test_can_login_with_email(self, db, api_client, mailoutbox):
         register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
@@ -164,6 +119,51 @@ class TestLogin:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert response.content.decode() == '{"non_field_errors":["Unable to log in with provided credentials."]}'
+
+
+class TestLogout:
+    def test_logout_token_is_removed_from_database(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        assert len(Token.objects.all()) == 1
+
+        response = logout(api_client, token)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {"detail": "Successfully logged out."}
+        assert len(Token.objects.all()) == 0
+
+
+class TestUserEndpoint:
+    def test_change_user_info(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(token)
+
+        payload = {"username": "user123", "first_name": "firstname", "last_name": "lastname"}
+        response = api_client.put(reverse("rest_user_details"), payload, headers=headers)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {'pk': 1, 'username': 'user123', 'email': 'test@test.example',
+                                 'first_name': 'firstname', 'last_name': 'lastname'}
+
+    def test_user_cannot_change_email(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(token)
+        user_before = api_client.get(reverse("rest_user_details"), headers=headers).data
+
+        payload = {"email": "abc@def.example"}
+        response = api_client.patch(reverse("rest_user_details"), payload, headers=headers)
+
+        assert response.status_code == status.HTTP_200_OK
+        user_after = api_client.get(reverse("rest_user_details"), headers=headers).data
+        assert user_after == user_before
+
+    def test_cannot_delete_user(self, db, api_client, mailoutbox):
+        token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        headers = auth_header(token)
+
+        response = api_client.delete(reverse("rest_user_details"), headers=headers)
+
+        assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
 class TestPasswordReset:
