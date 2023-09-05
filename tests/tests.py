@@ -222,6 +222,7 @@ class TestPasswordReset:
         response = api_client.post(reverse("rest_password_reset"), payload)
 
         assert response.status_code == status.HTTP_200_OK
+        assert response.data == {'detail': 'Password reset e-mail has been sent.'}
         assert len(mailoutbox) == 1
         email = mailoutbox[0].body
 
@@ -311,11 +312,12 @@ class TestPasswordReset:
         assert response.content.decode() == '{"uid":["Invalid value"]}'
 
     def test_password_reset_with_unknown_email_address_does_not_send_email(self, db, api_client, mailoutbox):
-        payload = {"email": "unknown@user.example"}
+        payload = {"email": REGISTER_PAYLOAD["email"]}
 
         response = api_client.post(reverse("rest_password_reset"), payload)
 
         assert response.status_code == status.HTTP_200_OK
+        assert response.data == {'detail': 'Password reset e-mail has been sent.'}
         assert len(mailoutbox) == 0
 
     def test_password_reset_confirm_view_does_nothing(self, db, requests_client):
