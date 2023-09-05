@@ -202,12 +202,20 @@ class TestLogout:
             rt_obj = RefreshToken(refresh_token)
             rt_obj.check_blacklist()
 
-    def test_logout_can_still_use_access_token(self, db, api_client, mailoutbox):
+    def test_after_logout_access_token_is_still_valid(self, db, api_client, mailoutbox):
         access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
         logout(api_client, access_token, refresh_token)
 
         AccessToken(access_token).verify()  # no exception raised
 
+        # verify access token
+        payload = {"token": access_token}
+        response = api_client.post(reverse("token_verify"), payload)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {}
+
+        # can use access token for authentication
         headers = auth_header(access_token)
         response = api_client.get(reverse("rest_user_details"), headers=headers)
 
@@ -425,6 +433,41 @@ class TestPasswordChange:
 
         # password wasn't changed in the database
         assert User.objects.get(pk=1).password == old_pw_in_db
+
+
+class TestVerifyJWT:
+    def test_verify_valid_tokens(self, db, api_client, mailoutbox):
+        tokens = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+
+        for token in tokens:
+            payload = {"token": token}
+            response = api_client.post(reverse("token_verify"), payload)
+
+            assert response.status_code == status.HTTP_200_OK
+            assert response.data == {}
+
+    def test_verify_blacklisted_token(self, db, api_client, mailoutbox):
+        access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+        logout(api_client, access_token, refresh_token)
+
+        payload = {"token": refresh_token}
+        response = api_client.post(reverse("token_verify"), payload)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data == {}
+
+    def test_verify_invalid_token(self, db, api_client, mailoutbox):
+        access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+
+        # manipulate the signature block
+        invalid_token = access_token[:-5] + access_token[-4:]
+        assert access_token != invalid_token
+
+        payload = {"token": invalid_token}
+        response = api_client.post(reverse("token_verify"), payload)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.content.decode() == '{"detail":"Token is invalid or expired","code":"token_not_valid"}'
 
 
 def register_user(client, payload):
