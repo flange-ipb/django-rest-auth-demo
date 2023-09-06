@@ -22,15 +22,12 @@ def test_verify_valid_tokens(db, api_client, mailoutbox):
 def test_can_verify_blacklisted_token(db, api_client, mailoutbox):
     access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
     logout(api_client, refresh_token)
-    with pytest.raises(TokenError):
-        rt_obj = RefreshToken(refresh_token)
-        rt_obj.check_blacklist()
 
     payload = {"token": refresh_token}
     response = api_client.post(reverse("token_verify"), payload)
 
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data == {}
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert response.content.decode() == '{"non_field_errors":["Token is blacklisted"]}'
 
 
 def test_verify_invalid_token(db, api_client, mailoutbox):
