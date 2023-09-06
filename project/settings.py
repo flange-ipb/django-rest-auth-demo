@@ -144,6 +144,13 @@ REST_FRAMEWORK = {
     ],
 }
 
+# djangorestframework-simplejwt settings
+# see https://django-rest-framework-simplejwt.readthedocs.io/en/latest/settings.html
+SIMPLE_JWT = {
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
+
 # dj-rest-auth settings
 # see https://dj-rest-auth.readthedocs.io/en/latest/configuration.html
 REST_AUTH = {

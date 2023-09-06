@@ -1,5 +1,8 @@
+import pytest
 from django.urls import reverse
 from rest_framework import status
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from tests.utils import register_and_login, REGISTER_PAYLOAD, logout
 
@@ -15,9 +18,13 @@ def test_verify_valid_tokens(db, api_client, mailoutbox):
         assert response.data == {}
 
 
-def test_verify_blacklisted_token(db, api_client, mailoutbox):
+# see https://github.com/jazzband/djangorestframework-simplejwt/issues/231
+def test_can_verify_blacklisted_token(db, api_client, mailoutbox):
     access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
     logout(api_client, refresh_token)
+    with pytest.raises(TokenError):
+        rt_obj = RefreshToken(refresh_token)
+        rt_obj.check_blacklist()
 
     payload = {"token": refresh_token}
     response = api_client.post(reverse("token_verify"), payload)

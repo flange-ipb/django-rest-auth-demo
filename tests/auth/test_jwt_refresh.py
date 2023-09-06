@@ -1,21 +1,30 @@
+import pytest
 from django.urls import reverse
 from rest_framework import status
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from tests.utils import register_and_login, REGISTER_PAYLOAD, logout
 
 
-def test_refresh_successful_get_new_access_token(db, api_client, mailoutbox):
+def test_refresh_successful_get_new_tokens_and_old_refresh_token_is_blacklisted(db, api_client, mailoutbox):
     _, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
 
     payload = {"refresh": refresh_token}
     response = api_client.post(reverse("token_refresh"), payload)
 
     assert response.status_code == status.HTTP_200_OK
-    new_access_token = response.data["access"]
+    new_tokens = (response.data["access"], response.data["refresh"])
 
-    # new token is valid
-    response = api_client.post(reverse("token_verify"), {"token": new_access_token})
-    assert response.status_code == status.HTTP_200_OK
+    # new tokens are valid
+    for token in new_tokens:
+        response = api_client.post(reverse("token_verify"), {"token": token})
+        assert response.status_code == status.HTTP_200_OK
+
+    # old refresh token is blacklisted
+    with pytest.raises(TokenError):
+        rt_obj = RefreshToken(refresh_token)
+        rt_obj.check_blacklist()
 
 
 def test_refresh_with_blacklisted_token(db, api_client, mailoutbox):
