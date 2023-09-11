@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
@@ -7,7 +7,7 @@ from tests.utils import register_and_verify, REGISTER_PAYLOAD, login
 
 def test_can_login_with_email(db, api_client, mailoutbox):
     register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
-    assert User.objects.get(pk=1).last_login is None
+    assert get_user_model().objects.get(pk=1).last_login is None
 
     payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
     response = login(api_client, payload)
@@ -16,7 +16,7 @@ def test_can_login_with_email(db, api_client, mailoutbox):
 
     # User's last_login field is NOT updated!
     # see https://github.com/iMerica/dj-rest-auth/issues/531
-    assert User.objects.get(pk=1).last_login is None
+    assert get_user_model().objects.get(pk=1).last_login is None
 
     # validate access token
     access_token = response.data["access"]
@@ -35,7 +35,7 @@ def test_can_login_with_email(db, api_client, mailoutbox):
     assert rt_obj.get("user_id") == 1
 
     assert response.data["user"] == {'pk': 1,
-                                     'username': REGISTER_PAYLOAD["username"],
+                                     'username': str(get_user_model().objects.get(pk=1).username),
                                      'email': REGISTER_PAYLOAD["email"],
                                      'first_name': '',
                                      'last_name': ''}
@@ -44,7 +44,7 @@ def test_can_login_with_email(db, api_client, mailoutbox):
 def test_cannot_login_with_username(db, api_client, mailoutbox):
     register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
-    payload = {"username": REGISTER_PAYLOAD["username"], "password": REGISTER_PAYLOAD["password1"]}
+    payload = {"username": str(get_user_model().objects.get(pk=1).username), "password": REGISTER_PAYLOAD["password1"]}
     response = login(api_client, payload)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -64,7 +64,7 @@ def test_cannot_login_with_wrong_password(db, api_client, mailoutbox):
 def test_inactive_user_cannot_login(db, api_client, mailoutbox):
     register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
-    user = User.objects.get(pk=1)
+    user = get_user_model().objects.get(pk=1)
     user.is_active = False
     user.save()
 

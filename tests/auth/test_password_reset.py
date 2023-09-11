@@ -1,5 +1,6 @@
 import re
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 
@@ -28,7 +29,7 @@ def test_password_reset_via_email(db, api_client, mailoutbox):
     email = mailoutbox[0].body
 
     # username is not part of the email
-    assert f'username is {REGISTER_PAYLOAD["username"]}' not in email
+    assert f'username is {str(get_user_model().objects.get(pk=1).username)}' not in email
 
     # extract user id and token from the email and send it to the confirm endpoint
     uid, confirm_token = extract_password_reset_email(email)
@@ -78,7 +79,7 @@ def test_cannot_reset_password_of_other_user_with_token(db, api_client, mailoutb
     register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
     mailoutbox.clear()
 
-    payload = {"username": "user2", "password1": "test1234", "password2": "test1234", "email": "user@user.example"}
+    payload = {"password1": "test1234", "password2": "test1234", "email": "user@user.example"}
     register_and_verify(api_client, payload, mailoutbox)
     mailoutbox.clear()
 

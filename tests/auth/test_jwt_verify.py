@@ -1,8 +1,5 @@
-import pytest
 from django.urls import reverse
 from rest_framework import status
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from tests.utils import register_and_login, REGISTER_PAYLOAD, logout
 

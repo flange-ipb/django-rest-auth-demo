@@ -2,7 +2,7 @@ import re
 
 from django.urls import reverse
 
-REGISTER_PAYLOAD = {"username": "test", "password1": "testtest", "password2": "testtest", "email": "test@test.example"}
+REGISTER_PAYLOAD = {"password1": "testtest", "password2": "testtest", "email": "test@test.example"}
 
 
 def register_user(client, payload):
