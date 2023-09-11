@@ -19,7 +19,7 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
-from project.app.views import not_found
+from project.app.views import not_found, CustomUserDetailsView
 
 schema_view = get_schema_view(
     openapi.Info(title="My API", default_version='v1'),
@@ -28,6 +28,8 @@ schema_view = get_schema_view(
 )
 
 urlpatterns = [
+    path('auth/user/', CustomUserDetailsView.as_view(), name='rest_user_details'),
+
     path('auth/', include('dj_rest_auth.urls')),
     path('auth/registration/', include('dj_rest_auth.registration.urls')),
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),

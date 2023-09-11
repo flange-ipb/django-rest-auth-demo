@@ -49,10 +49,27 @@ def test_user_cannot_change_email(db, api_client, mailoutbox):
     assert user_after == user_before
 
 
-def test_cannot_delete_user(db, api_client, mailoutbox):
+def test_can_delete_user(db, api_client, mailoutbox):
     access_token, _ = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
     headers = auth_header(access_token)
 
     response = api_client.delete(reverse("rest_user_details"), headers=headers)
 
-    assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert len(get_user_model().objects.all()) == 0
+
+
+def test_deleted_user_can_refresh_tokens(db, api_client, mailoutbox):
+    access_token, refresh_token = register_and_login(api_client, REGISTER_PAYLOAD, mailoutbox)
+    headers = auth_header(access_token)
+    api_client.delete(reverse("rest_user_details"), headers=headers)
+    assert len(get_user_model().objects.all()) == 0
+
+    payload = {"refresh": refresh_token}
+    response = api_client.post(reverse("token_refresh"), payload)
+
+    assert response.status_code == status.HTTP_200_OK
+    # new tokens are valid
+    for token in (response.data["access"], response.data["refresh"]):
+        response = api_client.post(reverse("token_verify"), {"token": token})
+        assert response.status_code == status.HTTP_200_OK
