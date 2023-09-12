@@ -1,4 +1,5 @@
 import pytest
+from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 from rest_framework_simplejwt.exceptions import TokenError
@@ -41,7 +42,7 @@ def test_after_logout_access_token_is_still_valid(db, api_client, mailoutbox):
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data == {'pk': 1,
-                             'username': REGISTER_PAYLOAD["username"],
+                             'username': User.objects.get(pk=1).username,
                              'email': REGISTER_PAYLOAD["email"],
                              'first_name': '',
                              'last_name': ''}

@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
@@ -16,7 +18,8 @@ def test_registration_workflow(db, api_client, mailoutbox):
     # user object was created
     assert len(User.objects.all()) == 1
     user = User.objects.get(pk=1)
-    assert user.username == REGISTER_PAYLOAD["username"]
+    assert user.username
+    assert uuid.UUID(user.username)
     assert user.email == REGISTER_PAYLOAD["email"]
 
     # user has an unverified email address
@@ -45,7 +48,7 @@ def test_registration_workflow(db, api_client, mailoutbox):
 
 
 def test_registration_fails_due_to_password_missmatch(db, api_client):
-    payload = {"username": "test", "password1": "test1234", "password2": "testtest", "email": "test@test.example"}
+    payload = {"password1": "test1234", "password2": "testtest", "email": "test@test.example"}
 
     response = api_client.post(reverse("rest_register"), payload)
 
@@ -53,15 +56,14 @@ def test_registration_fails_due_to_password_missmatch(db, api_client):
     assert response.content.decode() == '{"non_field_errors":["The two password fields didn\'t match."]}'
 
 
-def test_registration_fails_due_to_duplicate_username_and_email(db, api_client, mailoutbox):
+def test_registration_fails_due_to_duplicate_email(db, api_client, mailoutbox):
     register_user(api_client, REGISTER_PAYLOAD)
     mailoutbox.clear()
 
     response = register_user(api_client, REGISTER_PAYLOAD)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.content.decode() == '{"username":["A user with that username already exists."],' \
-                                        '"email":["A user is already registered with this e-mail address."]}'
+    assert response.content.decode() == '{"email":["A user is already registered with this e-mail address."]}'
     assert len(mailoutbox) == 0
 
 
@@ -69,7 +71,6 @@ def test_registration_fails_due_to_missing_fields(db, api_client):
     response = register_user(api_client, {})
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.content.decode() == '{"username":["This field is required."],' \
-                                        '"email":["This field is required."],' \
+    assert response.content.decode() == '{"email":["This field is required."],' \
                                         '"password1":["This field is required."],' \
                                         '"password2":["This field is required."]}'

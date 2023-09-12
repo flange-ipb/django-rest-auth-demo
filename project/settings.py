@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'dj_rest_auth',
     'dj_rest_auth.registration',
     'drf_yasg',
+    'project.app',
 ]
 
 MIDDLEWARE = [
@@ -159,6 +160,7 @@ REST_AUTH = {
     'TOKEN_MODEL': None,
     'USE_JWT': True,
     'JWT_AUTH_HTTPONLY': False,  # https://github.com/iMerica/dj-rest-auth/issues/485
+    'USER_DETAILS_SERIALIZER': 'project.app.serializers.CustomUserDetailsSerializer',
 }
 
 # django-allauth settings
@@ -166,6 +168,10 @@ REST_AUTH = {
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_EMAIL_VERIFICATION = 'mandatory'
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USERNAME_REQUIRED = False
+
+AUTH_USER_MODEL = 'auth.User'
 
 SWAGGER_SETTINGS = {
    'SECURITY_DEFINITIONS': {
