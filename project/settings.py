@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'dj_rest_auth',
     'dj_rest_auth.registration',
     'drf_yasg',
+    'guardian',
     'project.app',
 ]
 
@@ -136,6 +137,7 @@ SITE_ID = 1
 # https://github.com/iMerica/dj-rest-auth/issues/538#issuecomment-1695903674
 AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
+    'guardian.backends.ObjectPermissionBackend',
 ]
 
 REST_FRAMEWORK = {

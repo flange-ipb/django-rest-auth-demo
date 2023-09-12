@@ -3,7 +3,7 @@ import re
 from django.urls import reverse
 from rest_framework import status
 
-from tests.utils import register_and_verify, REGISTER_PAYLOAD, login
+from tests.utils import register_and_verify, REGISTER_PAYLOAD, login, user_obj
 
 
 def extract_password_reset_email(email):
@@ -88,7 +88,10 @@ def test_cannot_reset_password_of_other_user_with_token(db, api_client, mailoutb
 
     # try to reset password
     new_pw = "test1234"
-    payload = {"uid": 2, "token": confirm_token, "new_password1": new_pw, "new_password2": new_pw}
+    payload = {"uid": user_obj("user@user.example").id,
+               "token": confirm_token,
+               "new_password1": new_pw,
+               "new_password2": new_pw}
     response = api_client.post(reverse("rest_password_reset_confirm"), payload)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -103,13 +106,19 @@ def test_can_enumerate_user_ids_with_password_reset_confirm(db, api_client, mail
     register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
     new_pw = "test1234"
-    payload = {"uid": 1, "token": "xxx", "new_password1": new_pw, "new_password2": new_pw}
+    payload = {"uid": user_obj(REGISTER_PAYLOAD["email"]).id,
+               "token": "xxx",
+               "new_password1": new_pw,
+               "new_password2": new_pw}
     response = api_client.post(reverse("rest_password_reset_confirm"), payload)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.content.decode() == '{"token":["Invalid value"]}'
 
-    payload = {"uid": 2, "token": "xxx", "new_password1": new_pw, "new_password2": new_pw}
+    payload = {"uid": user_obj(REGISTER_PAYLOAD["email"]).id + 1,
+               "token": "xxx",
+               "new_password1": new_pw,
+               "new_password2": new_pw}
     response = api_client.post(reverse("rest_password_reset_confirm"), payload)
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST

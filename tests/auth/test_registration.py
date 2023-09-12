@@ -1,14 +1,14 @@
 import uuid
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 
-from tests.utils import register_user, REGISTER_PAYLOAD, extract_email_verify_email
+from tests.utils import register_user, REGISTER_PAYLOAD, extract_email_verify_email, user_obj
 
 
 def test_registration_workflow(db, api_client, mailoutbox):
-    assert len(User.objects.all()) == 0
+    assert len(get_user_model().objects.all()) == 1
 
     response = register_user(api_client, REGISTER_PAYLOAD)
 
@@ -16,8 +16,8 @@ def test_registration_workflow(db, api_client, mailoutbox):
     assert response.data == {'detail': 'Verification e-mail sent.'}
 
     # user object was created
-    assert len(User.objects.all()) == 1
-    user = User.objects.get(pk=1)
+    assert len(get_user_model().objects.all()) == 2
+    user = user_obj(REGISTER_PAYLOAD["email"])
     assert user.username
     assert uuid.UUID(user.username)
     assert user.email == REGISTER_PAYLOAD["email"]

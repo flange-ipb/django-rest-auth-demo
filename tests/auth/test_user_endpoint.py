@@ -1,8 +1,7 @@
-from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 
-from tests.utils import register_and_login, REGISTER_PAYLOAD, auth_header
+from tests.utils import register_and_login, REGISTER_PAYLOAD, auth_header, user_obj
 
 
 def test_change_user_info(db, api_client, mailoutbox):
@@ -13,8 +12,8 @@ def test_change_user_info(db, api_client, mailoutbox):
     response = api_client.put(reverse("rest_user_details"), payload, headers=headers)
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.data == {'pk': 1,
-                             'username': User.objects.get(pk=1).username,
+    assert response.data == {'pk': user_obj(REGISTER_PAYLOAD["email"]).id,
+                             'username': user_obj(REGISTER_PAYLOAD["email"]).username,
                              'email': 'test@test.example',
                              'first_name': 'firstname',
                              'last_name': 'lastname'}

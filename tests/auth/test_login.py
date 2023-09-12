@@ -1,13 +1,12 @@
-from django.contrib.auth.models import User
 from rest_framework import status
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
-from tests.utils import register_and_verify, REGISTER_PAYLOAD, login
+from tests.utils import register_and_verify, REGISTER_PAYLOAD, login, user_obj
 
 
 def test_can_login_with_email(db, api_client, mailoutbox):
     register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
-    assert User.objects.get(pk=1).last_login is None
+    assert user_obj(REGISTER_PAYLOAD["email"]).last_login is None
 
     payload = {"email": REGISTER_PAYLOAD["email"], "password": REGISTER_PAYLOAD["password1"]}
     response = login(api_client, payload)
@@ -16,7 +15,7 @@ def test_can_login_with_email(db, api_client, mailoutbox):
 
     # User's last_login field is NOT updated!
     # see https://github.com/iMerica/dj-rest-auth/issues/531
-    assert User.objects.get(pk=1).last_login is None
+    assert user_obj(REGISTER_PAYLOAD["email"]).last_login is None
 
     # validate access token
     access_token = response.data["access"]
@@ -24,7 +23,7 @@ def test_can_login_with_email(db, api_client, mailoutbox):
     at_obj = AccessToken(access_token)
     at_obj.verify()
     at_obj.verify_token_type()
-    assert at_obj.get("user_id") == 1
+    assert at_obj.get("user_id") == user_obj(REGISTER_PAYLOAD["email"]).id
 
     # validate refresh token
     refresh_token = response.data["refresh"]
@@ -32,10 +31,10 @@ def test_can_login_with_email(db, api_client, mailoutbox):
     rt_obj = RefreshToken(refresh_token)
     rt_obj.verify()
     rt_obj.verify_token_type()
-    assert rt_obj.get("user_id") == 1
+    assert rt_obj.get("user_id") == user_obj(REGISTER_PAYLOAD["email"]).id
 
-    assert response.data["user"] == {'pk': 1,
-                                     'username': User.objects.get(pk=1).username,
+    assert response.data["user"] == {'pk': user_obj(REGISTER_PAYLOAD["email"]).id,
+                                     'username': user_obj(REGISTER_PAYLOAD["email"]).username,
                                      'email': REGISTER_PAYLOAD["email"],
                                      'first_name': '',
                                      'last_name': ''}
@@ -64,7 +63,7 @@ def test_cannot_login_with_wrong_password(db, api_client, mailoutbox):
 def test_inactive_user_cannot_login(db, api_client, mailoutbox):
     register_and_verify(api_client, REGISTER_PAYLOAD, mailoutbox)
 
-    user = User.objects.get(pk=1)
+    user = user_obj(REGISTER_PAYLOAD["email"])
     user.is_active = False
     user.save()
 

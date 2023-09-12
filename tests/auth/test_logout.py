@@ -1,11 +1,10 @@
 import pytest
-from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 
-from tests.utils import register_and_login, REGISTER_PAYLOAD, logout, auth_header
+from tests.utils import register_and_login, REGISTER_PAYLOAD, logout, auth_header, user_obj
 
 
 def test_logout_refresh_token_gets_blacklisted(db, api_client, mailoutbox):
@@ -41,8 +40,8 @@ def test_after_logout_access_token_is_still_valid(db, api_client, mailoutbox):
     response = api_client.get(reverse("rest_user_details"), headers=headers)
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.data == {'pk': 1,
-                             'username': User.objects.get(pk=1).username,
+    assert response.data == {'pk': user_obj(REGISTER_PAYLOAD["email"]).id,
+                             'username': user_obj(REGISTER_PAYLOAD["email"]).username,
                              'email': REGISTER_PAYLOAD["email"],
                              'first_name': '',
                              'last_name': ''}

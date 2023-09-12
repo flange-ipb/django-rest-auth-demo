@@ -1,5 +1,6 @@
 import re
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 REGISTER_PAYLOAD = {"password1": "testtest", "password2": "testtest", "email": "test@test.example"}
@@ -40,3 +41,7 @@ def auth_header(token):
 
 def extract_email_verify_email(email):
     return re.search(r"account-confirm-email/(?P<key>[-:\w]+)", email).group("key")
+
+
+def user_obj(email):
+    return get_user_model().objects.get(email=email)
