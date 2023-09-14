@@ -1,7 +1,7 @@
 from django.urls import reverse
 from rest_framework import status
 
-from tests.utils import register_user, REGISTER_PAYLOAD, extract_email_verify_email, register_and_verify
+from tests.utils import register_user, REGISTER_PAYLOAD, extract_verify_email, register_and_verify
 
 
 def test_resend_email_verification_workflow(db, api_client, mailoutbox):
@@ -15,7 +15,7 @@ def test_resend_email_verification_workflow(db, api_client, mailoutbox):
     assert response.data == {'detail': 'ok'}
     assert len(mailoutbox) == 1
 
-    payload = {"key": extract_email_verify_email(mailoutbox[0].body)}
+    payload = {"key": extract_verify_email(mailoutbox[0].body)}
     response = api_client.post(reverse("rest_verify_email"), payload)
 
     assert response.status_code == status.HTTP_200_OK

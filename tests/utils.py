@@ -18,7 +18,7 @@ def login(client, payload):
 def register_and_verify(client, register_payload, mailbox):
     register_user(client, register_payload)
 
-    payload = {"key": extract_email_verify_email(mailbox[0].body)}
+    payload = {"key": extract_verify_email(mailbox[0].body)}
     client.post(reverse("rest_verify_email"), payload)
 
 
@@ -39,7 +39,7 @@ def auth_header(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def extract_email_verify_email(email):
+def extract_verify_email(email):
     return re.search(r"account-confirm-email/(?P<key>[-:\w]+)", email).group("key")
 
 
