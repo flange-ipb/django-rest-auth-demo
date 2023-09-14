@@ -14,12 +14,14 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from allauth.socialaccount.providers.github.views import oauth2_login as github_oauth2_login
+from allauth.socialaccount.providers.orcid.views import oauth2_login as orcid_oauth2_login
 from django.urls import path, include
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
-from project.app.views import not_found
+from project.app.views import not_found, GitHubLogin, ORCIDLogin
 
 schema_view = get_schema_view(
     openapi.Info(title="My API", default_version='v1'),
@@ -43,4 +45,28 @@ urlpatterns = [
 
     # Same argumentation as above: The SPA needs to invoke the 'rest_verify_email' view with the key as payload.
     path('spa/account-confirm-email/<key>', not_found, name='account_confirm_email'),
+
+    #
+    # GitHub login
+    #
+    # When the user hits the "Login by GitHub" button, the SPA redirects the user to
+    path('auth/github/login/', github_oauth2_login),
+    # This view redirects the user to the correct login url at GitHub. Then, the user comes back to the callback url.
+
+    # The SPA implements the callback url ...
+    path('spa/github/login/callback/', not_found, name='github_callback'),
+    # ... and POSTs "code" to
+    path('auth/github/authorize/', GitHubLogin.as_view(), name='github_login'),
+
+    #
+    # ORCID login
+    #
+    # When the user hits the "Login by ORCID" button, the SPA redirects the user to
+    path('auth/orcid/login/', orcid_oauth2_login),
+    # This view redirects the user to the correct login url at ORCID. Then, the user comes back to the callback url.
+
+    # The SPA implements the callback url ...
+    path('spa/orcid/login/callback/', not_found, name='orcid_callback'),
+    # ... and POSTs "code" to
+    path('auth/orcid/authorize/', ORCIDLogin.as_view(), name='orcid_login'),
 ]

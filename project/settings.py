@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'allauth',
     'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.github',
+    'allauth.socialaccount.providers.orcid',
     'dj_rest_auth',
     'dj_rest_auth.registration',
     'drf_yasg',
@@ -183,4 +186,26 @@ SWAGGER_SETTINGS = {
             'in': 'header'
       }
    }
+}
+
+# Social login
+SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+SOCIALACCOUNT_EMAIL_REQUIRED = False
+
+SOCIALACCOUNT_PROVIDERS = {
+    'github': {
+        'APP': {
+            'client_id': 'xxx',
+            'secret': 'very secret!',
+            'key': ''
+        }
+    },
+    'orcid': {
+        'APP': {
+            'client_id': 'xxx',
+            'secret': 'very secret!',
+            'key': ''
+        }
+    }
 }
