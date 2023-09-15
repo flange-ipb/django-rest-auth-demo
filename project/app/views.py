@@ -13,7 +13,6 @@ def not_found(*args, **kwargs):
 
 class GitHubMixin:
     adapter_class = GitHubOAuth2Adapter
-    callback_url = "http://127.0.0.1:8000/spa/github/login/callback/"
     client_class = OAuth2Client
 
 
@@ -27,6 +26,7 @@ class GitHubConnect(GitHubMixin, SocialConnectView):
 
 class ORCIDMixin:
     adapter_class = OrcidOAuth2Adapter
+    # TODO: remove when we have a proper hostname
     callback_url = "http://a.localhost:8000/spa/orcid/login/callback/"
     client_class = OAuth2Client
 
