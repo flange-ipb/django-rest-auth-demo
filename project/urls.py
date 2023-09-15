@@ -16,12 +16,13 @@ Including another URLconf
 """
 from allauth.socialaccount.providers.github.views import oauth2_login as github_oauth2_login
 from allauth.socialaccount.providers.orcid.views import oauth2_login as orcid_oauth2_login
+from dj_rest_auth.registration.views import SocialAccountListView
 from django.urls import path, include
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
-from project.app.views import not_found, GitHubLogin, ORCIDLogin
+from project.app.views import not_found, GitHubLogin, ORCIDLogin, GitHubConnect, ORCIDConnect
 
 schema_view = get_schema_view(
     openapi.Info(title="My API", default_version='v1'),
@@ -36,6 +37,7 @@ urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 
+
     # The view named 'password_reset_confirm' is only necessary to build the confirmation URL that is used in the
     # password reset email. It can be used to direct the client to an SPA's view which invokes the view
     # 'rest_password_reset_confirm' with the appropriate data.
@@ -45,6 +47,10 @@ urlpatterns = [
 
     # Same argumentation as above: The SPA needs to invoke the 'rest_verify_email' view with the key as payload.
     path('spa/account-confirm-email/<key>', not_found, name='account_confirm_email'),
+
+
+    # https://github.com/iMerica/dj-rest-auth/issues/26
+    path('auth/socialaccounts/', SocialAccountListView.as_view(), name='socialaccount_connections'),
 
     #
     # GitHub login
@@ -57,6 +63,7 @@ urlpatterns = [
     path('spa/github/login/callback/', not_found, name='github_callback'),
     # ... and POSTs "code" to
     path('auth/github/authorize/', GitHubLogin.as_view(), name='github_login'),
+    path('auth/github/connect/', GitHubConnect.as_view(), name="github_connect"),
 
     #
     # ORCID login
@@ -69,4 +76,5 @@ urlpatterns = [
     path('spa/orcid/login/callback/', not_found, name='orcid_callback'),
     # ... and POSTs "code" to
     path('auth/orcid/authorize/', ORCIDLogin.as_view(), name='orcid_login'),
+    path('auth/orcid/connect/', ORCIDConnect.as_view(), name="orcid_connect"),
 ]
