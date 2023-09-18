@@ -28,11 +28,12 @@ def add_orcid_when_user_is_created_by_orcid_login(sender, request, user, **kwarg
     if not social_account:
         return
 
-    orcid = extract_orcid_from_data(social_account.extra_data)
+    orcid = social_account.uid
     if not orcid:
         return
 
-    user_profile = user.userprofile if hasattr(user, "userprofile") else UserProfile(user=user, orcid=orcid)
+    user_profile = user.userprofile if hasattr(user, "userprofile") else UserProfile(user=user)
+    user_profile.orcid = orcid
     user_profile.save()
 
 
