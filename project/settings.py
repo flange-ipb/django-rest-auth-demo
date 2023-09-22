@@ -187,6 +187,9 @@ SWAGGER_SETTINGS = {
 }
 
 # Social login
+#
+# django-allauth social accounts settings
+# see https://django-allauth.readthedocs.io/en/latest/socialaccount/configuration.html
 SOCIALACCOUNT_LOGIN_ON_GET = True
 SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
 SOCIALACCOUNT_EMAIL_REQUIRED = False
